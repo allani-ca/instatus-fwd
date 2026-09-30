@@ -17,8 +17,6 @@ if [[ ! -f "$PAYLOAD_FILE" ]]; then
 fi
 
 # The signature is HMAC-SHA256 over the exact bytes sent in the request.
-# I think this is how the service expects the signature to be generated.
-# https://superuser.com/revisions/1311623/2
 SIGNATURE="$(
     openssl dgst -sha256 -hmac "$SECRET" "$PAYLOAD_FILE" |
     awk '{print $NF}'

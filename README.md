@@ -135,4 +135,5 @@ The handler:
 - only accepts POST
 - limits request bodies to 1 MiB
 - times out Discord requests
+- verifies the Instatus HMAC before parsing the event
 - disables Discord mentions with allowed_mentions
