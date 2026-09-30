@@ -10,6 +10,7 @@ User=instatus
 Group=instatus
 
 EnvironmentFile=/etc/instatus-discord.env
+
 ExecStart=/usr/local/bin/instatus-discord
 
 Restart=on-failure
@@ -23,7 +24,6 @@ ProtectHome=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
-# FYI this means no file sockets
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 LockPersonality=true
 MemoryDenyWriteExecute=true
