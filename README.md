@@ -30,3 +30,27 @@ export STATUS_PAGE_NAME='BSky Status'
 
 ./instatus-discord
 ```
+
+## Test
+
+Use the same Instatus secret:
+
+```bash
+export INSTATUS_WEBHOOK_SECRET='your-secret'
+./test/send-test.sh
+```
+
+The test signs the exact JSON bytes being sent.
+
+## Invalid signature test
+
+```bash
+./test/test-invalid-signature.sh
+```
+
+Expected response:
+
+```text
+HTTP/1.1 401 Unauthorized
+Invalid Instatus signature
+```
