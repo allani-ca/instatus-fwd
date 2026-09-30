@@ -114,6 +114,30 @@ Logs:
 sudo journalctl -u instatus-discord -f
 ```
 
+## Reverse proxy / Cloudflare Tunnel
+
+The example binds to:
+
+```text
+127.0.0.1:8080
+```
+
+For Cloudflare Tunnel, proxy the public hostname to:
+
+```text
+http://127.0.0.1:8080
+```
+
+The webhook endpoint is:
+
+```text
+/webhook
+```
+
+The appplication currently accepts POST requests on any path, so `/webhook` is
+conventional rather than required. If desired, add explicit path checking in
+handler.go.
+
 ## Security
 
 Use:
