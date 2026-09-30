@@ -4,8 +4,6 @@ Small dependency-free Go HTTP service that receives Instatus webhooks and
 forwards incidents, maintenance events, and component status changes to a
 Discord webhook.
 
-It is designed to run identically on multiple VPSes.
-
 ## Requirements
 
 - Go 1.25+
@@ -53,4 +51,65 @@ Expected response:
 ```text
 HTTP/1.1 401 Unauthorized
 Invalid Instatus signature
+```
+
+## Production installation
+
+Create the service account:
+
+```bash
+sudo useradd \
+  --system \
+  --no-create-home \
+  --shell /usr/sbin/nologin \
+  instatus
+```
+
+Install the binary:
+
+```bash
+sudo install -o root -g root -m 0755 \
+  instatus-discord \
+  /usr/local/bin/instatus-discord
+```
+
+Install environment:
+
+```bash
+sudo install -o root -g root -m 0600 \
+  instatus-discord.env.example \
+  /etc/instatus-discord.env
+```
+
+Edit it:
+
+```bash
+sudoedit /etc/instatus-discord.env
+```
+
+Install systemd unit:
+
+```bash
+sudo install -o root -g root -m 0644 \
+  systemd/instatus-discord.service \
+  /etc/systemd/system/instatus-discord.service
+```
+
+Start:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now instatus-discord
+```
+
+Check:
+
+```bash
+sudo systemctl status instatus-discord
+```
+
+Logs:
+
+```bash
+sudo journalctl -u instatus-discord -f
 ```
