@@ -134,7 +134,7 @@ The webhook endpoint is:
 /webhook
 ```
 
-The appplication currently accepts POST requests on any path, so `/webhook` is
+The application currently accepts POST requests on any path, so `/webhook` is
 conventional rather than required. If desired, add explicit path checking in
 handler.go.
 
