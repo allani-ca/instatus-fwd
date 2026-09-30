@@ -13,9 +13,10 @@ const (
 	maxBodySize = 1 << 20 // 1 MiB
 )
 
+// newHandler constructs the HTTP handler that validates and forwards webhooks.
 func newHandler(cfg Config) http.Handler {
 	client := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: cfg.DiscordTimeout,
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +53,7 @@ func newHandler(cfg Config) http.Handler {
 
 		payload, err := decodePayload(body)
 		if err != nil {
+			log.Printf("Malformed Instatus payload: %v", err)
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -70,7 +72,7 @@ func newHandler(cfg Config) http.Handler {
 			},
 		}
 
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), cfg.DiscordTimeout)
 		defer cancel()
 
 		if err := sendToDiscord(ctx, client, cfg.DiscordWebhookURL, discordPayload); err != nil {
@@ -85,141 +87,121 @@ func newHandler(cfg Config) http.Handler {
 	})
 }
 
+// buildEmbed converts a supported Instatus event into a Discord embed.
 func buildEmbed(payload Payload, footerName string) (DiscordEmbed, bool) {
 	pageURL := ""
 	if payload.Page != nil {
 		pageURL = payload.Page.URL
 	}
 
-	// Incident
 	if payload.Incident != nil {
 		incident := payload.Incident
-
 		status := incident.Status
 		description := "There is an update to this incident."
-
 		if len(incident.IncidentUpdates) > 0 {
 			if body := incident.IncidentUpdates[0].Body; body != "" {
 				description = truncate(body, 2000)
 			}
 		}
 
-		fields := make([]DiscordField, 0, 2)
-
-		if status != "" {
-			fields = append(fields, DiscordField{
-				Name:   "Status",
-				Value:  statusEmoji(status) + " " + prettyStatus(status),
-				Inline: true,
-			})
-		}
-
-		if incident.Impact != "" {
-			fields = append(fields, DiscordField{
-				Name:   "Impact",
-				Value:  prettyImpact(incident.Impact),
-				Inline: true,
-			})
-		}
-
-		embed := DiscordEmbed{
-			Title:       statusEmoji(status) + " " + truncate(defaultString(incident.Name, "Service Incident"), 256),
-			Description: description,
-			Color:       discordColor("incident", status),
-			Fields:      fields,
-			Footer: &DiscordFooter{
-				Text: footerName,
-			},
-			Timestamp: firstNonEmpty(
-				incident.UpdatedAt,
-				incident.CreatedAt,
-				time.Now().UTC().Format(time.RFC3339),
-			),
-		}
-
-		embed.URL = firstNonEmpty(incident.URL, pageURL)
-
-		return embed, true
+		return createEmbed(
+			statusEmoji(status)+" "+truncate(defaultString(incident.Name, "Service Incident"), 256),
+			description,
+			"incident",
+			status,
+			footerName,
+			firstNonEmpty(incident.URL, pageURL),
+			createCommonFields(status, incident.Impact),
+			incident.UpdatedAt,
+			incident.CreatedAt,
+		), true
 	}
 
-	// Maintenance
 	if payload.Maintenance != nil {
 		maintenance := payload.Maintenance
-
 		status := maintenance.Status
 		description := "There is an update to scheduled maintenance."
-
 		if len(maintenance.MaintenanceUpdates) > 0 {
 			if body := maintenance.MaintenanceUpdates[0].Body; body != "" {
 				description = truncate(body, 2000)
 			}
 		}
 
-		fields := make([]DiscordField, 0, 1)
-
-		if status != "" {
-			fields = append(fields, DiscordField{
-				Name:   "Status",
-				Value:  statusEmoji(status) + " " + prettyStatus(status),
-				Inline: true,
-			})
-		}
-
-		embed := DiscordEmbed{
-			Title:       "🔧 " + truncate(defaultString(maintenance.Name, "Scheduled Maintenance"), 256),
-			Description: description,
-			Color:       discordColor("maintenance", status),
-			Fields:      fields,
-			Footer: &DiscordFooter{
-				Text: footerName,
-			},
-			Timestamp: firstNonEmpty(
-				maintenance.UpdatedAt,
-				maintenance.CreatedAt,
-				time.Now().UTC().Format(time.RFC3339),
-			),
-		}
-
-		embed.URL = firstNonEmpty(maintenance.URL, pageURL)
-
-		return embed, true
+		return createEmbed(
+			"🔧 "+truncate(defaultString(maintenance.Name, "Scheduled Maintenance"), 256),
+			description,
+			"maintenance",
+			status,
+			footerName,
+			firstNonEmpty(maintenance.URL, pageURL),
+			createCommonFields(status, ""),
+			maintenance.UpdatedAt,
+			maintenance.CreatedAt,
+		), true
 	}
 
-	// Component update
 	if payload.Component != nil && payload.ComponentUpdate != nil {
 		component := payload.Component
 		update := payload.ComponentUpdate
-
 		status := firstNonEmpty(update.NewStatus, component.Status)
-
-		embed := DiscordEmbed{
-			Title:       statusEmoji(status) + " " + truncate(defaultString(component.Name, "Component"), 256),
-			Description: "Component status changed to **" + prettyStatus(status) + "**.",
-			Color:       discordColor("component", status),
-			Fields: []DiscordField{
-				{
-					Name:   "Status",
-					Value:  statusEmoji(status) + " " + prettyStatus(status),
-					Inline: true,
-				},
-			},
-			Footer: &DiscordFooter{
-				Text: footerName,
-			},
-			Timestamp: firstNonEmpty(
-				update.CreatedAt,
-				component.CreatedAt,
-				time.Now().UTC().Format(time.RFC3339),
-			),
-			URL: pageURL,
-		}
-
-		return embed, true
+		return createEmbed(
+			statusEmoji(status)+" "+truncate(defaultString(component.Name, "Component"), 256),
+			"Component status changed to **"+prettyStatus(status)+"**.",
+			"component",
+			status,
+			footerName,
+			pageURL,
+			createCommonFields(status, ""),
+			update.CreatedAt,
+			component.CreatedAt,
+		), true
 	}
 
 	return DiscordEmbed{}, false
 }
 
+// createEmbed fills the fields shared by each supported event embed.
+func createEmbed(title, description, eventType, status, footerName, pageURL string, fields []DiscordField, timestamps ...string) DiscordEmbed {
+	return DiscordEmbed{
+		Title:       title,
+		Description: description,
+		URL:         pageURL,
+		Color:       discordColor(eventType, status),
+		Fields:      fields,
+		Footer:      &DiscordFooter{Text: footerName},
+		Timestamp:   formatTimestamp(timestamps...),
+	}
+}
+
+// createCommonFields adds status and impact fields when values are available.
+func createCommonFields(status, impact string) []DiscordField {
+	fields := make([]DiscordField, 0, 2)
+	if status != "" {
+		fields = append(fields, DiscordField{
+			Name:   "Status",
+			Value:  statusEmoji(status) + " " + prettyStatus(status),
+			Inline: true,
+		})
+	}
+	if impact != "" {
+		fields = append(fields, DiscordField{
+			Name:   "Impact",
+			Value:  prettyImpact(impact),
+			Inline: true,
+		})
+	}
+	return fields
+}
+
+// formatTimestamp selects the first event timestamp or the current UTC time.
+func formatTimestamp(values ...string) string {
+	if timestamp := firstNonEmpty(values...); timestamp != "" {
+		return timestamp
+	}
+	return time.Now().UTC().Format(time.RFC3339)
+}
+
+// statusEmoji returns the indicator associated with an Instatus status.
 func statusEmoji(status string) string {
 	switch strings.ToUpper(status) {
 	case "INVESTIGATING":
@@ -251,6 +233,7 @@ func statusEmoji(status string) string {
 	}
 }
 
+// prettyStatus converts an Instatus status code into readable text.
 func prettyStatus(status string) string {
 	switch strings.ToUpper(status) {
 	case "INVESTIGATING":
@@ -283,6 +266,7 @@ func prettyStatus(status string) string {
 	}
 }
 
+// prettyImpact converts an impact code into readable text.
 func prettyImpact(impact string) string {
 	switch strings.ToUpper(impact) {
 	case "NONE":
@@ -298,6 +282,7 @@ func prettyImpact(impact string) string {
 	}
 }
 
+// titleWords capitalizes the first character of each whitespace-separated word.
 func titleWords(s string) string {
 	parts := strings.Fields(s)
 
@@ -312,6 +297,7 @@ func titleWords(s string) string {
 	return strings.Join(parts, " ")
 }
 
+// truncate limits a string to max runes, adding an ellipsis when needed.
 func truncate(s string, max int) string {
 	runes := []rune(s)
 
@@ -326,6 +312,7 @@ func truncate(s string, max int) string {
 	return string(runes[:max-3]) + "..."
 }
 
+// defaultString returns fallback when value is empty.
 func defaultString(value, fallback string) string {
 	if value == "" {
 		return fallback
@@ -334,6 +321,7 @@ func defaultString(value, fallback string) string {
 	return value
 }
 
+// firstNonEmpty returns the first non-empty string, or an empty string.
 func firstNonEmpty(values ...string) string {
 	for _, value := range values {
 		if value != "" {
@@ -343,4 +331,3 @@ func firstNonEmpty(values ...string) string {
 
 	return ""
 }
-

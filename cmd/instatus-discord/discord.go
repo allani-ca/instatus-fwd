@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 )
 
+// DiscordEmbed represents an embed sent to a Discord webhook.
 type DiscordEmbed struct {
 	Title       string         `json:"title,omitempty"`
 	Description string         `json:"description,omitempty"`
@@ -20,26 +20,31 @@ type DiscordEmbed struct {
 	Timestamp   string         `json:"timestamp,omitempty"`
 }
 
+// DiscordField represents a named field within a Discord embed.
 type DiscordField struct {
 	Name   string `json:"name"`
 	Value  string `json:"value"`
 	Inline bool   `json:"inline,omitempty"`
 }
 
+// DiscordFooter contains the attribution text shown below an embed.
 type DiscordFooter struct {
 	Text string `json:"text"`
 }
 
+// DiscordPayload is the JSON request body accepted by a Discord webhook.
 type DiscordPayload struct {
-	Username         string         `json:"username"`
-	Embeds           []DiscordEmbed `json:"embeds"`
-	AllowedMentions  AllowedMentions `json:"allowed_mentions"`
+	Username        string          `json:"username"`
+	Embeds          []DiscordEmbed  `json:"embeds"`
+	AllowedMentions AllowedMentions `json:"allowed_mentions"`
 }
 
+// AllowedMentions controls which Discord mentions may trigger notifications.
 type AllowedMentions struct {
 	Parse []string `json:"parse"`
 }
 
+// sendToDiscord serializes and posts a payload to a Discord webhook.
 func sendToDiscord(ctx context.Context, client *http.Client, webhookURL string, payload DiscordPayload) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -71,6 +76,7 @@ func sendToDiscord(ctx context.Context, client *http.Client, webhookURL string, 
 	return nil
 }
 
+// discordColor maps an event type and status to its Discord embed color.
 func discordColor(eventType, status string) int {
 	status = strings.ToUpper(status)
 

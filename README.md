@@ -25,9 +25,19 @@ export DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/...'
 export INSTATUS_WEBHOOK_SECRET='your-secret'
 export LISTEN_ADDR='127.0.0.1:8080'
 export STATUS_PAGE_NAME='BSky Status'
+export DISCORD_TIMEOUT='10s'
+export READ_HEADER_TIMEOUT='5s'
+export READ_TIMEOUT='10s'
+export WRITE_TIMEOUT='15s'
+export IDLE_TIMEOUT='60s'
 
 ./instatus-discord
 ```
+
+`DISCORD_WEBHOOK_URL` must be an HTTPS Discord webhook URL in the
+`/api/webhooks/{id}/{token}` format. Timeout variables accept Go duration
+strings such as `500ms`, `10s`, or `2m`; omitted values use the defaults shown
+above, and configured values must be positive.
 
 ## Test
 
@@ -161,3 +171,10 @@ The handler:
 - times out Discord requests
 - verifies the Instatus HMAC before parsing the event
 - disables Discord mentions with allowed_mentions
+
+Configuration, signature verification, payload decoding, and Discord color
+mapping are covered by Go unit tests:
+
+```bash
+go test ./...
+```

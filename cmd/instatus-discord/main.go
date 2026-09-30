@@ -3,10 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
 	"time"
 )
 
+// main loads configuration and starts the webhook HTTP service.
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
@@ -18,10 +18,10 @@ func main() {
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
 		Handler:           loggingMiddleware(handler),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      15 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		ReadTimeout:       cfg.ReadTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
 	}
 
 	log.Printf("instatus-discord listening on %s", cfg.ListenAddr)
@@ -32,6 +32,7 @@ func main() {
 	}
 }
 
+// loggingMiddleware records the duration and source of each HTTP request.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -42,5 +43,4 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 func init() {
 	log.SetFlags(log.Ldate | log.Ltime | log.LUTC | log.Lmicroseconds)
-	_ = os.Stdout
 }
