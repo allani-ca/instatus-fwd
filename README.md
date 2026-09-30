@@ -113,3 +113,26 @@ Logs:
 ```bash
 sudo journalctl -u instatus-discord -f
 ```
+
+## Security
+
+Use:
+
+```text
+/etc/instatus-discord.env
+```
+
+with permissions:
+
+```text
+0600
+```
+
+The service runs as the unprivileged `instatus` user.
+
+The handler:
+
+- only accepts POST
+- limits request bodies to 1 MiB
+- times out Discord requests
+- disables Discord mentions with allowed_mentions
